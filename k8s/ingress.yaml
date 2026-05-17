@@ -1,0 +1,45 @@
+# Hermes dashboard ingress.
+#
+# Exposes the dashboard UI at https://hermes.intelli-verse-x.ai. The
+# OpenAI-compatible API server lives at https://hermes-api.intelli-verse-x.ai
+# (separate hostname because the dashboard sets cookies on the root path).
+#
+# NOTE: the dashboard stores API keys in plaintext config — DO NOT expose
+# without an OAuth proxy in front. For now we restrict by Cloudflare Access /
+# IP allowlist. See docs/security.md.
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hermes-ingress
+  namespace: aicart
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443},{"HTTP":80}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:970547373533:certificate/REPLACE_WITH_WILDCARD_CERT_ARN
+    alb.ingress.kubernetes.io/group.name: intelli-verse-x
+spec:
+  rules:
+    - host: hermes.intelli-verse-x.ai
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hermes
+                port:
+                  number: 80
+    - host: hermes-api.intelli-verse-x.ai
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hermes
+                port:
+                  number: 8080

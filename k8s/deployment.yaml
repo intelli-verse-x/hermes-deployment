@@ -1,0 +1,185 @@
+# Hermes Agent — Discord gateway deployment.
+#
+# Runs the Hermes messaging gateway as a single replica with a persistent
+# volume for ~/.hermes (memory.db, sessions, skills, config). The gateway
+# connects to Discord, listens for DMs/mentions, and routes to the Hermes
+# agent loop running in the same container.
+#
+# Image is built from the official hermes-agent Dockerfile with our config
+# baked in. See `Dockerfile` in this repo.
+#
+# Why one replica:
+#   - Gateway state (Discord session, voice connections) doesn't shard.
+#   - Memory.db is SQLite; multi-writer not supported.
+#   - For load, scale UP per-tenant rather than horizontally per-bot.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hermes-data
+  namespace: aicart
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: gp2
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hermes
+  namespace: aicart
+spec:
+  selector:
+    app: hermes
+  ports:
+    - name: dashboard
+      port: 80
+      targetPort: 7777
+    - name: api
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hermes
+  namespace: aicart
+  labels:
+    app: hermes
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # SQLite memory.db; do NOT roll with 2 replicas live.
+  selector:
+    matchLabels:
+      app: hermes
+  template:
+    metadata:
+      labels:
+        app: hermes
+    spec:
+      containers:
+        - name: hermes
+          image: 970547373533.dkr.ecr.us-east-1.amazonaws.com/hermes-agent:latest
+          imagePullPolicy: Always
+          command: ["/opt/hermes/bin/entrypoint.sh"]
+          ports:
+            - containerPort: 7777
+              name: dashboard
+            - containerPort: 8080
+              name: api
+          env:
+            # ── Model gateway → LiteLLM ──────────────────────────────────
+            - name: HERMES_INFERENCE_PROVIDER
+              value: "custom"
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-secrets
+                  key: LITELLM_API_KEY
+            - name: HERMES_BASE_URL
+              value: "https://litellm.intelli-verse-x.ai/v1"
+
+            # ── Gas Town root (mounted from the gastown pod's PVC) ──────
+            - name: GT_TOWN_ROOT
+              value: "/gt"
+
+            # ── MCP server env passthroughs ─────────────────────────────
+            - name: N8N_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: n8n-admin
+                  key: API_KEY
+                  optional: true
+            - name: CONTENT_FACTORY_MCP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-secrets
+                  key: CONTENT_FACTORY_MCP_TOKEN
+                  optional: true
+            - name: INTELLI_VERSE_X_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-secrets
+                  key: INTELLI_VERSE_X_API_TOKEN
+                  optional: true
+            - name: FIRECRAWL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-secrets
+                  key: FIRECRAWL_API_KEY
+                  optional: true
+
+            # ── Infisical (optional secret backend) ─────────────────────
+            - name: INFISICAL_BASE_URL
+              value: "https://infisical.intelli-verse-x.ai"
+            - name: INFISICAL_MACHINE_IDENTITY_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: infisical-admin
+                  key: MACHINE_IDENTITY_TOKEN
+                  optional: true
+
+            # ── Discord gateway ─────────────────────────────────────────
+            # Re-use the same bot we wired into n8n.
+            - name: DISCORD_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-secrets
+                  key: DISCORD_BOT_TOKEN
+            - name: DISCORD_ALLOWED_USERS
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-secrets
+                  key: DISCORD_ALLOWED_USERS
+                  optional: true
+
+            # ── Langfuse (auto-traced via LiteLLM, no key needed here) ──
+
+            # ── Dashboard ───────────────────────────────────────────────
+            - name: HERMES_DASHBOARD_HOST
+              value: "0.0.0.0"
+            - name: HERMES_DASHBOARD_PORT
+              value: "7777"
+
+          volumeMounts:
+            - name: data
+              mountPath: /opt/data
+            - name: gastown
+              mountPath: /gt
+              readOnly: false
+            - name: config
+              mountPath: /opt/hermes/config-bundle
+
+          resources:
+            requests:
+              memory: 1Gi
+              cpu: 250m
+            limits:
+              memory: 4Gi
+              cpu: 2000m
+
+          readinessProbe:
+            tcpSocket:
+              port: 7777
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 7777
+            initialDelaySeconds: 30
+            periodSeconds: 30
+
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: hermes-data
+        - name: gastown
+          persistentVolumeClaim:
+            claimName: gastown-pvc # already exists in aicart
+        - name: config
+          configMap:
+            name: hermes-config-bundle

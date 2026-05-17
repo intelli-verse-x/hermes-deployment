@@ -1,0 +1,179 @@
+# Hermes Agent — intelli-verse-x config
+#
+# Drops into ~/.hermes/config.yaml. This is the operational config that wires
+# Hermes into our stack:
+#
+#   - Model gateway     : LiteLLM (https://litellm.intelli-verse-x.ai) so all
+#                         model calls flow through the same gateway as the rest
+#                         of Gas Town, with Langfuse tracing + budgets/guardrails.
+#   - MCP servers       : leantime (tickets), gt (Gas Town beads/rigs/mail),
+#                         content-factory (50+ video/image pipelines),
+#                         content-factory-media (image/video/tts/music/motion),
+#                         leantime-mcp (HTTP, redundant w/ leantime stdio),
+#                         intelli-verse-x (in-house tooling),
+#                         firecrawl (research), filesystem (sandbox).
+#   - External skills   : pulls skills from our 3 existing skill repos so we
+#                         don't duplicate. ~/.hermes/skills/ stays writable
+#                         for agent-curated skills.
+#   - Memory            : default persistent memory + FTS5 session search
+#                         (no external memory provider — keeps state local).
+#   - Context files     : AGENTS.md + SOUL.md picked up from cwd at startup.
+#
+# Override per-machine by editing ~/.hermes/config.yaml.local (gitignored).
+# .env carries secrets and lives next to this file.
+
+model:
+  # All LLM traffic goes through LiteLLM so spend tracking + Langfuse tracing
+  # apply to Hermes the same way they do to every other agent. LiteLLM
+  # routes to whatever upstream provider we've configured for the model name
+  # (anthropic/claude-opus-4.6, openai/o3, openai/gpt-5, etc.).
+  default: "anthropic/claude-opus-4.6"
+  provider: "custom"
+  base_url: "https://litellm.intelli-verse-x.ai/v1"
+  # api_key is set via .env (LITELLM_API_KEY) or the OPENAI_API_KEY fallback.
+
+# Fallback chain — if the primary model rate-limits or fails, drop to the next.
+# All hops go through LiteLLM so we stay observable.
+fallback_models:
+  - "anthropic/claude-opus-4.6"
+  - "openai/o3"
+  - "openai/gpt-5"
+
+mcp_servers:
+  # ── 1. Gas Town beads/rigs/mail ─────────────────────────────────────────
+  # gt itself is an MCP server (added in gastown#8, via Ophis Cobra→MCP
+  # bridge). Exposes ~289 read + coordination subcommands. Hermes can list
+  # beads, sling work, post mail, escalate, all without shelling.
+  gt:
+    command: "gt"
+    args: ["mcp", "serve", "--stdio"]
+    env:
+      GT_TOWN_ROOT: "${GT_TOWN_ROOT}"
+
+  # ── 2. Leantime via OSS bridge (HTTP) ──────────────────────────────────
+  # Live at leantime-mcp.intelli-verse-x.ai. Bridges Leantime JSON-RPC to
+  # MCP. Tools: list_projects, list_tickets, get_ticket, create_ticket,
+  # update_ticket, list_users, discover.
+  leantime:
+    url: "https://leantime-mcp.intelli-verse-x.ai/mcp"
+    timeout: 30
+
+  # ── 3. Content Factory pipeline runner ──────────────────────────────────
+  # 50+ media pipelines (learning_series, movie, podcast2video, ad_banners,
+  # game trailers, app_store_deployer, etc.). FastMCP server lives in
+  # dev/content-factory/mcp_server/server.py — for k8s use we expose it
+  # behind an ingress (intelli-verse-kube-infra/content-factory/).
+  content-factory:
+    url: "${CONTENT_FACTORY_MCP_URL:-https://content-factory-mcp.intelli-verse-x.ai/mcp}"
+    timeout: 60
+    headers:
+      Authorization: "Bearer ${CONTENT_FACTORY_MCP_TOKEN}"
+
+  # ── 4. Content Factory media (provider-agnostic) ───────────────────────
+  # generate_image/video/tts/music/motion — the lower-level primitives
+  # behind the pipeline server. Use this when you want a single asset
+  # without spinning up a full pipeline.
+  content-factory-media:
+    url: "${CONTENT_FACTORY_MEDIA_MCP_URL:-https://content-factory-media-mcp.intelli-verse-x.ai/mcp}"
+    timeout: 120
+    headers:
+      Authorization: "Bearer ${CONTENT_FACTORY_MCP_TOKEN}"
+
+  # ── 5. n8n (workflow automation) ───────────────────────────────────────
+  # Lets Hermes fire / inspect workflows on the live n8n. Useful for the
+  # gt-escalate → Discord flow and any human-in-the-loop workflows.
+  n8n:
+    url: "https://n8n.intelli-verse-x.ai/mcp"
+    timeout: 30
+    headers:
+      X-N8N-API-KEY: "${N8N_API_KEY}"
+
+  # ── 6. intelli-verse-x in-house MCP ────────────────────────────────────
+  # Custom tools for Intelliverse-X analytics/games/quizverse. Lives in
+  # the user MCP folder; we point at the same binary the rest of the
+  # workspace uses.
+  intelli-verse-x:
+    command: "uvx"
+    args: ["intelli-verse-x-mcp"]
+    env:
+      INTELLI_VERSE_X_API_TOKEN: "${INTELLI_VERSE_X_API_TOKEN}"
+
+  # ── 7. Firecrawl (research, web scraping) ──────────────────────────────
+  firecrawl:
+    command: "firecrawl"
+    args: ["mcp", "serve"]
+    env:
+      FIRECRAWL_API_KEY: "${FIRECRAWL_API_KEY}"
+
+  # ── 8. Filesystem (sandboxed) ──────────────────────────────────────────
+  # Read-write access only to ~/hermes-workspace so Hermes doesn't roam.
+  filesystem:
+    command: "npx"
+    args:
+      - "-y"
+      - "@modelcontextprotocol/server-filesystem"
+      - "${HOME}/hermes-workspace"
+
+skills:
+  # External skill directories — read-only. Hermes will see every skill in
+  # these trees as if it were under ~/.hermes/skills/. Local copies (under
+  # ~/.hermes/skills/) shadow these if a name collision happens.
+  external_dirs:
+    # 1) intelli-verse-x agent skills (game-trailer, content-factory-pipeline,
+    #    aso-brief, gastown-sling, k8s-gpu-rollout, etc.)
+    - "${HOME}/dev/intelli-verse-x-agent-skills/skills"
+    # 2) Intelli-verse-X-SDK skills (game-sdk, ai-integration, cross-platform,
+    #    live-ops, monetization, multiplayer, quiz-content, sdk-setup,
+    #    store-launcher, platforms)
+    - "${HOME}/dev/Intelli-verse-X-SDK/skills"
+    # 3) Anideebee agent-skills mega-collection (huge, opt-in)
+    - "${HOME}/dev/agent-skills/.agents/skills"
+    # 4) Agentic-SEO-Skill (SEO playbooks)
+    - "${HOME}/dev/Agentic-SEO-Skill/resources/skills"
+    # 5) Geo-optimizer skill (GEO playbooks)
+    - "${HOME}/dev/geo-optimizer-skill/src/geo_optimizer/skills"
+    # 6) hyperframes skills (3D/AR/AVR)
+    - "${HOME}/dev/hyperframes/skills"
+    # 7) Bundled hermes-deployment skills (this repo)
+    - "${HOME}/dev/hermes-deployment/skills"
+
+  # Don't auto-load every skill into the system prompt — too many. Load on
+  # demand via /<skill-name> or `skill_view`.
+  auto_load_threshold: 8
+
+memory:
+  # Default: local SQLite + FTS5 session search. No external provider —
+  # we want Hermes's memory to stay on the box / in its PVC so it doesn't
+  # leak into a third party.
+  enabled: true
+  # The agent can save proactively, but ask for confirmation on writes
+  # tagged 'user' (the dialectic user model).
+  user_writes_require_confirmation: false
+
+# Context files: AGENTS.md + SOUL.md auto-loaded at session start.
+# AGENTS.md ships with this repo and gives Hermes the intelli-verse-x map.
+context_files:
+  enabled: true
+
+# Toolset shape — narrow by default. The wider toolset can be enabled per
+# session with /toolset <name>.
+default_toolset: "general"
+
+# Curator runs in the background, summarizes sessions, prunes memory.
+curator:
+  enabled: true
+  # Run every 30 minutes when idle.
+  interval_minutes: 30
+
+# Gateway: which messaging platforms are wired. Set via env so we don't
+# leak tokens into git.
+gateway:
+  discord:
+    enabled: true
+    # Token lives in .env (DISCORD_BOT_TOKEN already in n8n + this gateway
+    # share the same Discord application).
+  # telegram / slack / signal / email can be flipped on later. Each requires
+  # additional env (see .env.example).
+
+# Skin: dark-ish, matches Gas Town's vibe.
+skin: "midnight"
