@@ -64,10 +64,12 @@ mcp_servers:
       GT_TOWN_ROOT: "${GT_TOWN_ROOT}"
 
   # ── 2. Leantime via OSS bridge (HTTP) ──────────────────────────────────
-  # Live at leantime-mcp.intelli-verse-x.ai. Bridges Leantime JSON-RPC to
-  # MCP. Tools: list_projects, list_tickets, get_ticket, create_ticket,
-  # update_ticket, list_users, discover.
+  # DISABLED: leantime-mcp 0.1.2 only serves the raw Leantime JSON-RPC
+  # bridge (/rpc — answers "method not found: initialize"); no path speaks
+  # MCP. Use admin-mcp's admin_call_mcp (tileId 'leantime') until the
+  # deployment ships a real MCP endpoint, then re-enable.
   leantime:
+    enabled: false
     url: "https://leantime-mcp.intelli-verse-x.ai/mcp"
     timeout: 30
 
@@ -177,7 +179,10 @@ mcp_servers:
     headers:
       Authorization: "Bearer ${INTELLIVERSE_MCP_TOKEN}"
 
+  # DISABLED: no agent-mcp deployment/ingress exists in the cluster — the
+  # hostname resolves to the wildcard ALB and 404s. Re-enable once deployed.
   agent-mcp: # Content Factory agent (pipeline runs, releases, ads)
+    enabled: false
     url: "https://agent-mcp.intelli-verse-x.ai/mcp"
     timeout: 60
 
