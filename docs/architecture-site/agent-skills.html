@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>agent-skills — the shared registry · AI Agency Architecture</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+  <button class="menu-btn">Menu</button>
+  <div class="logo"><span class="dot"></span> AI Agency Architecture</div>
+  <div class="tagline">Intelliverse · one page per codebase</div>
+  <nav>
+    <a href="index.html">🏠 Overview</a>
+    <a href="hermes-agent.html">🤖 hermes-agent — runtime fork</a>
+    <a href="hermes-deployment.html">🚀 hermes-deployment — ops glue</a>
+    <a href="desktop.html">🖥️ Desktop apps</a>
+    <a href="agent-skills.html" class="active">🧩 agent-skills — registry</a>
+    <a href="stack.html">🧱 Platform wiring</a>
+  </nav>
+  <button class="theme-toggle"></button>
+</aside>
+<main>
+<h1>agent-skills — the shared skill registry</h1>
+<p class="lede"><span class="badge always">CANONICAL REGISTRY</span> &nbsp;
+<code>intelli-verse-x/agent-skills</code> (checkout: <code>intelli-verse-x-agent-skills</code>).
+A skill is a markdown playbook (<code>SKILL.md</code>) an agent follows step by step. This repo is the
+<strong>single canonical place</strong> where org-specific skills live — write one once, and Hermes,
+Cursor, Claude Code, Codex, GitHub Copilot and kagent can all run it.</p>
+
+<h2>The problem it solves</h2>
+<p>Before this repo, skills were scattered: <code>.cursor/skills/</code> here,
+<code>.claude/skills/</code> there, <code>~/.hermes/skills/</code> somewhere else — duplicated and
+drifting in every repo. The <a href="https://agentskills.io" target="_blank" rel="noreferrer">agentskills.io</a>
+standard (Dec 2025) fixed the format: one folder layout, YAML frontmatter, progressive disclosure
+(discovery → activation → execution), and every major AI client knows how to load it. This repo is our
+implementation of that standard: consumers pull it in as a git submodule or a read-only mount and
+symlink the subfolders they need.</p>
+
+<h2>Repo layout</h2>
+<div class="table-wrap"><table>
+<tr><th>Path</th><th>What it is</th></tr>
+<tr><td><code>skills/&lt;name&gt;/SKILL.md</code></td><td>One folder per skill, spec-compliant frontmatter + playbook body.</td></tr>
+<tr><td><code>bringup/</code></td><td>Setup/bootstrap material for wiring the registry into a new client.</td></tr>
+<tr><td><code>HANDOFF.md</code></td><td>Working notes for agents contributing to the registry.</td></tr>
+</table></div>
+
+<h2>The skills</h2>
+<div class="table-wrap"><table>
+<tr><th>Skill</th><th>What it does</th><th>Used by</th></tr>
+<tr><td><code>ivx-content-factory-pipeline</code></td><td>Trigger any of the 50+ Content Factory pipelines, poll status, surface artefacts.</td><td>Cursor, Claude Code, Hermes</td></tr>
+<tr><td><code>ivx-aso-brief</code></td><td>App Store / Play Store ASO intel pipeline with live Firecrawl signals and council voting.</td><td>Cursor, Hermes</td></tr>
+<tr><td><code>ivx-game-trailer</code></td><td>End-to-end game trailer (storyboard → animatic → audio → final) via Content Factory.</td><td>Cursor, Hermes</td></tr>
+<tr><td><code>ivx-k8s-gpu-rollout</code></td><td>Safe rollout of GPU sidecar manifests (comfyui, vllm, musetalk…) via kagent.</td><td>Cursor, kagent, Hermes</td></tr>
+<tr><td><code>ivx-gastown-sling</code></td><td>Dispatch coding work across the Gas Town swarm — pick a polecat, sling a bead, monitor the convoy.</td><td>Cursor, Hermes, Mayor</td></tr>
+<tr><td><code>ivx-cf-run-dispatcher</code></td><td>Trigger a Content Factory run via public API + post an operator kanban card for a swarm worker.</td><td>Hermes (cron, webhooks)</td></tr>
+<tr><td><code>ivx-cf-pipeline-operator</code></td><td>Own a CF run end to end: watch the API, pull pod logs on stalls, diagnose, open fix PRs, retry until success.</td><td>Hermes (1 worker per run)</td></tr>
+</table></div>
+
+<h2>How each consumer loads it</h2>
+<div class="table-wrap"><table>
+<tr><th>Consumer</th><th>Mechanism</th></tr>
+<tr><td>Hermes (AI Agency)</td><td>Read-only external skill mount in <code>hermes-deployment/config/config.yaml</code> — one of <a href="hermes-deployment.html">7 mounted skill repos</a>. Local agent-curated skills shadow registry skills on name collision.</td></tr>
+<tr><td>Cursor / Claude Code / Codex</td><td>Symlink the <code>skills/</code> subfolders into each repo's client-specific skills dir (or reference directly — same folder format).</td></tr>
+<tr><td>Admin portal copilot</td><td>Built-in skills live in the portal's own catalog (see the <a href="https://intelliverse-skills-docs.s3.amazonaws.com/index.html" target="_blank" rel="noreferrer">Copilot Skills Guide</a>); org skills from this registry are the model for cross-client playbooks.</td></tr>
+</table></div>
+
+<div class="callout ok"><span class="title">Design rule: skills over integrations</span>
+When the AI Agency needs a new capability, the order of preference is: (1) an existing MCP server +
+a skill that orchestrates it, (2) a new skill in this registry, (3) only as a last resort, runtime
+code in the fork. Skills are markdown — cheap to write, review and roll back.</div>
+
+<footer class="page-footer">
+<span>AI Agency architecture · <code>intelli-verse-x/agent-skills</code></span>
+<span><a href="index.html">← Overview</a></span>
+</footer>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Desktop apps · AI Agency Architecture</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+  <button class="menu-btn">Menu</button>
+  <div class="logo"><span class="dot"></span> AI Agency Architecture</div>
+  <div class="tagline">Intelliverse · one page per codebase</div>
+  <nav>
+    <a href="index.html">🏠 Overview</a>
+    <a href="hermes-agent.html">🤖 hermes-agent — runtime fork</a>
+    <a href="hermes-deployment.html">🚀 hermes-deployment — ops glue</a>
+    <a href="desktop.html" class="active">🖥️ Desktop apps</a>
+    <a href="agent-skills.html">🧩 agent-skills — registry</a>
+    <a href="stack.html">🧱 Platform wiring</a>
+  </nav>
+  <button class="theme-toggle"></button>
+</aside>
+<main>
+<h1>Desktop apps — two shells, two jobs</h1>
+<p class="lede">The AI Agency has two desktop surfaces. They look similar (a native window with our
+tools inside) but they wrap different things: one wraps the <strong>hosted admin portal</strong>, the
+other wraps the <strong>Hermes agent itself</strong>. Neither reimplements features — both follow the
+"fork the surface, not the runtime" rule.</p>
+
+<h2>1 · Intelliverse X (Tauri shell)</h2>
+<p><span class="badge external">SEPARATE REPO</span> &nbsp;<code>intelliverse-x-desktop</code> —
+"desktop shell for the Intelliverse admin portal (Windows, macOS, Linux)".</p>
+<div class="table-wrap"><table>
+<tr><th>Property</th><th>Value</th></tr>
+<tr><td>Framework</td><td>Tauri 2 (Rust core + system webview — tiny binaries, no bundled Chromium)</td></tr>
+<tr><td>Product name / id</td><td><code>Intelliverse X</code> / <code>ai.intelli-verse-x.desktop</code></td></tr>
+<tr><td>What it shows</td><td>The <strong>hosted</strong> portal at <code>admin.intelli-verse-x.ai</code>, loaded directly via <code>WebviewUrl::External</code> in <code>src-tauri/src/lib.rs</code>. The local <code>ui/index.html</code> is only a loading placeholder.</td></tr>
+<tr><td>Layout</td><td><code>src-tauri/</code> (Rust: window, permissions, capabilities, icons) · <code>ui/</code> (placeholder page) · <code>scripts/</code></td></tr>
+<tr><td>Build</td><td><code>npm run dev</code> / <code>npm run build</code> (Tauri CLI v2)</td></tr>
+</table></div>
+<div class="callout"><span class="title">Why this design</span>
+Because the window loads the live portal, the desktop app is always up to date — every portal deploy
+(copilot, tiles, skills, insights) ships to desktop users instantly, with no app-store release cycle.
+The Rust shell only adds what the web can't: a real window, OS integration, and a place to grow
+native capabilities (tray, notifications, deep links).</div>
+
+<h2>2 · Hermes Desktop (Electron client, inside the fork)</h2>
+<p><span class="badge pinned">LIVES IN hermes-agent/desktop</span> &nbsp;The upstream Hermes Desktop
+client (merged upstream May 2026), customized in our fork as the
+<em>"IX Agency admin portal shell with VPN, MCP and Skills panels"</em>.</p>
+<div class="table-wrap"><table>
+<tr><th>Property</th><th>Value</th></tr>
+<tr><td>Framework</td><td>Electron 38 + TypeScript, bundled with esbuild (<code>scripts/build.mjs</code>)</td></tr>
+<tr><td>Package</td><td><code>hermes-desktop</code> 0.1.0 (private), main: <code>dist/main/main.js</code></td></tr>
+<tr><td>What it wraps</td><td>The <strong>Hermes gateway</strong> — connect to a local or remote agent with a session token and get the full dashboard/TUI experience in a window.</td></tr>
+<tr><td>Our panels</td><td><strong>VPN</strong> (connect to the private network the agent operates in), <strong>MCP</strong> (inspect/enable tool servers), <strong>Skills</strong> (browse and trigger skills).</td></tr>
+<tr><td>Pipeline</td><td><code>npm run generate</code> → <code>typecheck</code> → <code>bundle</code>; <code>npm start</code> to run; <code>--smoke</code> flag for CI smoke tests.</td></tr>
+</table></div>
+
+<h2>Which one is "the AI Agency app"?</h2>
+<div class="table-wrap"><table>
+<tr><th></th><th>Intelliverse X (Tauri)</th><th>Hermes Desktop (Electron)</th></tr>
+<tr><td>Audience</td><td>Everyone on the team — admins, creators, ops</td><td>Agent power-users and engineers</td></tr>
+<tr><td>Wraps</td><td>Hosted admin portal (copilot, tiles, insights)</td><td>The Hermes agent gateway directly</td></tr>
+<tr><td>Needs a server?</td><td>No — just internet</td><td>Yes — a local or remote Hermes gateway</td></tr>
+<tr><td>Updates</td><td>Instant (web deploys)</td><td>App release (npm build)</td></tr>
+<tr><td>Status</td><td>Early — repo scaffolded, window loads production portal</td><td>Active — tracks the fork's release train</td></tr>
+</table></div>
+<p>Long-term the two converge: the Tauri shell is the distribution vehicle (small, signed,
+auto-updating), and the agent panels from Hermes Desktop graduate into portal pages, which the shell
+then picks up for free.</p>
+
+<footer class="page-footer">
+<span>AI Agency architecture · <code>intelliverse-x-desktop</code> + <code>hermes-agent/desktop</code></span>
+<span><a href="index.html">← Overview</a></span>
+</footer>
+</main>
+</div>
+</body>
+</html>

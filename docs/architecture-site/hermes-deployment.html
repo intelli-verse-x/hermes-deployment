@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>hermes-deployment — the ops glue · AI Agency Architecture</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+  <button class="menu-btn">Menu</button>
+  <div class="logo"><span class="dot"></span> AI Agency Architecture</div>
+  <div class="tagline">Intelliverse · one page per codebase</div>
+  <nav>
+    <a href="index.html">🏠 Overview</a>
+    <a href="hermes-agent.html">🤖 hermes-agent — runtime fork</a>
+    <a href="hermes-deployment.html" class="active">🚀 hermes-deployment — ops glue</a>
+    <a href="desktop.html">🖥️ Desktop apps</a>
+    <a href="agent-skills.html">🧩 agent-skills — registry</a>
+    <a href="stack.html">🧱 Platform wiring</a>
+  </nav>
+  <button class="theme-toggle"></button>
+</aside>
+<main>
+<h1>hermes-deployment — the ops glue</h1>
+<p class="lede"><span class="badge always">DAY-TO-DAY REPO</span> &nbsp;
+<code>intelli-verse-x/hermes-deployment</code>. The runtime fork is the binary substrate — <strong>this
+repo is where the AI Agency actually gets configured, deployed and operated</strong>. If you change how
+the agent behaves, which tools it has, or where it runs, you change this repo.</p>
+
+<h2>What lives here</h2>
+<div class="table-wrap"><table>
+<tr><th>Path</th><th>What it is</th></tr>
+<tr><td><code>config/config.yaml</code></td><td>The pre-wired Hermes config: LiteLLM as the (only) model provider, MCP servers for Gas Town/Beads, Leantime, Content Factory, n8n and Firecrawl, memory settings, and <strong>7 external skill-repo mounts</strong> so we never duplicate a skill.</td></tr>
+<tr><td><code>config/AGENTS.md</code></td><td>The context file Hermes auto-loads at the top of every session — a map of the whole intelli-verse-x stack, so the agent knows what every service is and which tool reaches it.</td></tr>
+<tr><td><code>config/.env.example</code></td><td>Secrets template (minimum: <code>LITELLM_API_KEY</code>).</td></tr>
+<tr><td><code>skills/</code></td><td>Deployment-bundled skills: <code>ivx-stack-tour</code>, <code>ivx-products-tour</code>, <code>ivx-content-factory</code>, <code>ivx-gastown-bridge</code>.</td></tr>
+<tr><td><code>k8s/</code></td><td>Cluster manifests for the always-on gateway pod: deployment + service + ingress + configmap.</td></tr>
+<tr><td><code>scripts/install-local.sh</code></td><td>One-command laptop install — every engineer gets the identical agent locally.</td></tr>
+<tr><td><code>scripts/entrypoint.sh</code></td><td>K8s entrypoint that seeds the persistent volume from the bundled config on first boot.</td></tr>
+<tr><td><code>scripts/seed-cluster-secrets.sh</code></td><td>Populates the pod's secrets from existing cluster secrets where possible.</td></tr>
+<tr><td><code>Dockerfile</code></td><td>Production image: official Hermes (from our pinned fork) + our binaries + the config bundle.</td></tr>
+<tr><td><code>docs/</code></td><td>Operating runbook, cited best-practices — and this architecture site (<code>docs/architecture-site/</code>).</td></tr>
+</table></div>
+
+<h2>The deployed shape</h2>
+<div class="diagram-wrap"><pre style="border:none;background:none;margin:0;"><code> Discord / Telegram users
+          │
+          ▼
+ hermes.intelli-verse-x.ai        (dashboard ingress)
+ hermes-api.intelli-verse-x.ai    (API ingress)
+          │
+ ┌────────▼─────────┐   image: ECR hermes-agent:latest
+ │  deploy/hermes    │   namespace: aicart
+ │  (gateway pod)    │──── PVC "hermes-data" (sessions, memory,
+ └────────┬─────────┘     agent-curated skills; seeded on first boot)
+          │
+          ├── LiteLLM  (all model calls)
+          └── MCP: gt/beads · leantime · content-factory · n8n · firecrawl</code></pre></div>
+
+<h3>Deploying</h3>
+<pre><code># build + push the image
+docker buildx build --platform linux/amd64 \
+  -t 970547373533.dkr.ecr.us-east-1.amazonaws.com/hermes-agent:latest --push .
+
+# seed the config bundle + secrets
+kubectl create configmap hermes-config-bundle -n aicart \
+  --from-file=config.yaml=config/config.yaml \
+  --from-file=AGENTS.md=config/AGENTS.md \
+  --dry-run=client -o yaml | kubectl apply -f -
+./scripts/seed-cluster-secrets.sh
+
+# roll out
+kubectl apply -f k8s/
+kubectl rollout status -n aicart deploy/hermes</code></pre>
+
+<h3>Local install (laptop)</h3>
+<pre><code>git clone git@github.com:intelli-verse-x/hermes-deployment.git
+cd hermes-deployment && ./scripts/install-local.sh
+# edit ~/.hermes/.env  (at minimum: LITELLM_API_KEY)
+hermes doctor && hermes</code></pre>
+
+<h2>Skill mounts — why 7 repos</h2>
+<p>The config mounts external skill directories <strong>read-only</strong>; Hermes sees every skill in
+those trees as if it were local, and its own agent-curated skills (in <code>~/.hermes/skills/</code>)
+shadow them on name collisions. This is how one skill, written once, serves every agent:</p>
+<ol>
+  <li><code>intelli-verse-x-agent-skills/skills</code> — <a href="agent-skills.html">the org registry</a> (canonical)</li>
+  <li><code>Intelli-verse-X-SDK/skills</code> — game-SDK, AI-integration, cross-platform skills</li>
+  <li><code>agent-skills/.agents/skills</code> — the Anideebee mega-collection (opt-in)</li>
+  <li><code>Agentic-SEO-Skill/resources/skills</code> — SEO playbooks</li>
+  <li><code>geo-optimizer-skill/…/skills</code> — GEO (AI-search optimization) playbooks</li>
+  <li><code>hyperframes/skills</code> — 3D/AR/VR skills</li>
+  <li><code>hermes-deployment/skills</code> — the 4 bundled deployment skills above</li>
+</ol>
+
+<h2>How Hermes plugs into the 5-layer stack</h2>
+<div class="table-wrap"><table>
+<tr><th>Layer</th><th>Service</th><th>How Hermes uses it</th></tr>
+<tr><td>1 · Strategy</td><td>Leantime</td><td><code>mcp_leantime_*</code> — list/create/update tickets; strategy lives here.</td></tr>
+<tr><td>1 · Strategy</td><td>GitHub</td><td><code>gh</code> CLI in shell tools (no MCP needed).</td></tr>
+<tr><td>2 · Coordination</td><td>Beads (<code>bd</code>)</td><td><code>mcp_gt_bd_*</code> — every nontrivial request becomes a bead; auditable work graph.</td></tr>
+<tr><td>2 · Coordination</td><td>Bernstein</td><td>Hermes dispatches via <code>gt sling</code>; Bernstein owns each project's coding crew.</td></tr>
+<tr><td>3 · Multi-project</td><td>Gas Town</td><td><code>mcp_gt_*</code> — rigs, mail, nudges, convoy status across all repos.</td></tr>
+<tr><td>4 · Platform</td><td>LiteLLM</td><td><strong>All</strong> LLM calls (<code>provider: custom</code>).</td></tr>
+<tr><td>4 · Platform</td><td>Infisical</td><td>Optional secret backend via machine identity token.</td></tr>
+<tr><td>4 · Platform</td><td>Langfuse</td><td>Automatic — LiteLLM forwards traces; zero Hermes config.</td></tr>
+<tr><td>5 · Glue</td><td>n8n</td><td><code>mcp_n8n_*</code> — workflow triggers (gt-escalate → Discord, etc.).</td></tr>
+<tr><td>5 · Glue</td><td>GitHub Actions</td><td>Via <code>gh</code> CLI; cross-provider review workflow.</td></tr>
+</table></div>
+
+<div class="callout ok"><span class="title">The mental model: beads are the unit of work</span>
+Per <code>config/AGENTS.md</code>, every nontrivial request the agent takes becomes a bead
+(<code>bd create</code> → work → <code>bd close</code>), even when the agent does the work itself —
+so everything the AI Agency does is auditable. Work that belongs to a specialist coding crew is
+<em>slung</em> to a Gas Town rig instead of done inline.</div>
+
+<footer class="page-footer">
+<span>AI Agency architecture · <code>intelli-verse-x/hermes-deployment</code></span>
+<span><a href="index.html">← Overview</a></span>
+</footer>
+</main>
+</div>
+</body>
+</html>
