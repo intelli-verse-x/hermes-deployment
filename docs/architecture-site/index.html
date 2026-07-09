@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Agency — Architecture Overview</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+  <button class="menu-btn">Menu</button>
+  <div class="logo"><span class="dot"></span> AI Agency Architecture</div>
+  <div class="tagline">Intelliverse · one page per codebase</div>
+  <nav>
+    <a href="index.html" class="active">🏠 Overview</a>
+    <a href="hermes-agent.html">🤖 hermes-agent — runtime fork</a>
+    <a href="hermes-deployment.html">🚀 hermes-deployment — ops glue</a>
+    <a href="desktop.html">🖥️ Desktop apps</a>
+    <a href="agent-skills.html">🧩 agent-skills — registry</a>
+    <a href="stack.html">🧱 Platform wiring</a>
+  </nav>
+  <button class="theme-toggle"></button>
+</aside>
+<main>
+<h1>AI Agency — how it's built</h1>
+<p class="lede">The AI Agency is our productized agent: a self-improving AI worker (built on the
+open-source <a href="https://github.com/NousResearch/hermes-agent" target="_blank" rel="noreferrer">Hermes Agent</a>)
+that does real agency-style work — research, content production, ads, design, game ops — and lives
+wherever the team does: a desktop app, Discord, Telegram, CLI. This site explains the architecture of
+<strong>each codebase</strong> that makes it up, in plain language first and engineering detail second.</p>
+
+<div class="callout ok"><span class="title">The one-paragraph version</span>
+A pinned fork of the Hermes runtime (<code>hermes-agent</code>) does the thinking; a small ops repo
+(<code>hermes-deployment</code>) tells it about our world and runs it on the cluster and on laptops;
+two desktop shells put a friendly window on top; and a shared skills registry
+(<code>agent-skills</code>) teaches every AI client in the org the same playbooks. Everything talks to
+the rest of the platform (models, secrets, work tracking, content pipelines) through MCP — the same
+protocol the admin portal copilot uses.</div>
+
+<h2>The four codebases</h2>
+<div class="hero-grid">
+  <a class="tile" href="hermes-agent.html"><div class="t">🤖 hermes-agent</div>
+    <div class="d">Our fork of the Nous Research agent runtime — the brain. Gateway to Discord/Telegram/CLI, learning loop, MCP tools, and the Hermes Desktop client. Pinned to upstream tags.</div></a>
+  <a class="tile" href="hermes-deployment.html"><div class="t">🚀 hermes-deployment</div>
+    <div class="d">The operational glue: pre-wired config, bundled skills, Kubernetes manifests, laptop installer, and runbooks. Day-to-day work happens here, not in the fork.</div></a>
+  <a class="tile" href="desktop.html"><div class="t">🖥️ Desktop apps</div>
+    <div class="d">Two shells: the Tauri "Intelliverse X" app that wraps the hosted admin portal, and Hermes Desktop (Electron) with VPN, MCP and Skills panels.</div></a>
+  <a class="tile" href="agent-skills.html"><div class="t">🧩 agent-skills</div>
+    <div class="d">The org's skill registry on the agentskills.io open standard — write a playbook once, use it from Hermes, Cursor, Claude Code, Codex and the admin copilot.</div></a>
+</div>
+
+<h2>How the pieces connect</h2>
+<div class="diagram-wrap"><pre style="border:none;background:none;margin:0;"><code>        You (Discord · Telegram · CLI · Desktop app)
+                          │
+              ┌───────────▼───────────┐
+              │      hermes-agent      │  ← the runtime (our fork, pinned)
+              │  gateway · agent loop  │
+              │  memory · skills · cron│
+              └───┬───────────────┬───┘
+   configured by  │               │  talks MCP to
+┌─────────────────▼──┐   ┌────────▼─────────────────────────┐
+│  hermes-deployment │   │  the platform                    │
+│  config.yaml       │   │  LiteLLM (all models)            │
+│  AGENTS.md context │   │  Gas Town / Beads (agent work)   │
+│  k8s manifests     │   │  Leantime (tickets)              │
+│  bundled skills    │   │  Content Factory (media)         │
+└────────────────────┘   │  n8n · Firecrawl · Stitch · …    │
+          ▲              └──────────────────────────────────┘
+          │ loads skills from
+┌─────────┴──────────┐
+│    agent-skills    │  ← shared playbooks (agentskills.io)
+│  + 6 more skill    │
+│    repos           │
+└────────────────────┘</code></pre></div>
+
+<h2>Design principles</h2>
+<ul>
+  <li><strong>Fork the surface, not the runtime.</strong> <code>hermes-agent</code> is pinned to upstream
+  tagged releases; our own code lives in the deployment repo, plugins, and UI shells. Patches worth
+  keeping get PR'd back upstream. This keeps us on the release train of a 200k-star project instead of
+  maintaining a divergent fork.</li>
+  <li><strong>Config over code.</strong> Everything org-specific — which model gateway, which MCP servers,
+  which skills — is YAML and markdown in <code>hermes-deployment</code>. Redeploying the agent with new
+  behavior is a config change, not a rebuild.</li>
+  <li><strong>One skill format everywhere.</strong> Skills follow the
+  <a href="https://agentskills.io" target="_blank" rel="noreferrer">agentskills.io</a> standard, so the same
+  <code>SKILL.md</code> powers Hermes, Cursor, Claude Code and the admin portal copilot.</li>
+  <li><strong>Everything through MCP.</strong> The agent has no bespoke integrations. Content Factory,
+  Gas Town, Leantime, n8n, Firecrawl, Google Stitch — all reached through the same Model Context Protocol
+  servers the admin copilot uses. Add an MCP server and every agent in the org gets the capability.</li>
+  <li><strong>All model traffic through LiteLLM.</strong> One gateway, one budget, automatic Langfuse
+  tracing. The agent never holds a raw provider key.</li>
+</ul>
+
+<h2>Where things run</h2>
+<div class="table-wrap"><table>
+<tr><th>Surface</th><th>Where</th><th>What runs there</th></tr>
+<tr><td>Cluster (24/7)</td><td>EKS, namespace <code>aicart</code></td><td>Hermes Discord/Telegram gateway pod — <code>hermes.intelli-verse-x.ai</code> (dashboard), <code>hermes-api.intelli-verse-x.ai</code> (API). State on a PVC, seeded from the config bundle on first boot.</td></tr>
+<tr><td>Laptops</td><td>macOS / Linux</td><td><code>scripts/install-local.sh</code> gives every engineer the same agent locally: same config, same skills, same LiteLLM key.</td></tr>
+<tr><td>Desktop</td><td>Windows / macOS / Linux</td><td>The Tauri shell (hosted admin portal in a native window) and Hermes Desktop (Electron client for the agent itself).</td></tr>
+</table></div>
+
+<h2>Reading order</h2>
+<ol>
+  <li>New to the project? Read <a href="hermes-agent.html">hermes-agent</a> to understand what the runtime can do.</li>
+  <li>Then <a href="hermes-deployment.html">hermes-deployment</a> — this is where our configuration and operations actually live.</li>
+  <li><a href="stack.html">Platform wiring</a> shows how the agent reaches models, work tracking, and content pipelines.</li>
+  <li><a href="desktop.html">Desktop apps</a> and <a href="agent-skills.html">agent-skills</a> cover the user-facing shell and the shared playbook library.</li>
+</ol>
+
+<footer class="page-footer">
+<span>AI Agency architecture · source: <code>hermes-deployment/docs/architecture-site</code></span>
+<span>Questions → #intelli-verse-help on Discord</span>
+</footer>
+</main>
+</div>
+</body>
+</html>

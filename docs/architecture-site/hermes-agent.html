@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>hermes-agent — the runtime fork · AI Agency Architecture</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+  <button class="menu-btn">Menu</button>
+  <div class="logo"><span class="dot"></span> AI Agency Architecture</div>
+  <div class="tagline">Intelliverse · one page per codebase</div>
+  <nav>
+    <a href="index.html">🏠 Overview</a>
+    <a href="hermes-agent.html" class="active">🤖 hermes-agent — runtime fork</a>
+    <a href="hermes-deployment.html">🚀 hermes-deployment — ops glue</a>
+    <a href="desktop.html">🖥️ Desktop apps</a>
+    <a href="agent-skills.html">🧩 agent-skills — registry</a>
+    <a href="stack.html">🧱 Platform wiring</a>
+  </nav>
+  <button class="theme-toggle"></button>
+</aside>
+<main>
+<h1>hermes-agent — the runtime fork</h1>
+<p class="lede"><span class="badge pinned">FORK · PINNED TO UPSTREAM</span> &nbsp;
+<code>intelli-verse-x/hermes-agent</code>, forked from
+<a href="https://github.com/NousResearch/hermes-agent" target="_blank" rel="noreferrer">NousResearch/hermes-agent</a>
+(MIT, ~200k stars). This is the brain of the AI Agency: the agent loop, the multi-platform gateway,
+the learning system, and the Hermes Desktop client all live in this one monorepo.</p>
+
+<h2>What it is, in plain language</h2>
+<p>Hermes is "the agent that grows with you". Unlike a chatbot, it has a <strong>closed learning
+loop</strong>: after finishing a complex task it writes itself a skill, improves that skill the next
+time it's used, keeps searchable memory of every past conversation, and builds a model of each user
+across sessions. It runs 24/7 on a server — you talk to it from Discord or Telegram while it works on
+a cloud machine, and pick the same conversation up from your laptop later.</p>
+
+<h2>Why we forked (and what we don't do)</h2>
+<ul>
+  <li><strong>Reproducible builds</strong> — our Docker image pins a specific upstream tag, so cluster
+  rollouts can't drift when upstream moves (they release fast).</li>
+  <li><strong>In-house plugins</strong> — org-specific extensions (e.g. a memory provider reading our
+  Beads work graph) live in the fork; generic fixes get PR'd back upstream.</li>
+  <li><strong>Patch independence</strong> — we can ship a security fix without waiting on upstream's
+  merge cycle.</li>
+</ul>
+<div class="callout warn"><span class="title">What we deliberately don't do</span>
+We do <strong>not</strong> rewrite the runtime. The fork tracks upstream closely; anything
+org-specific that can live in <a href="hermes-deployment.html">hermes-deployment</a> (config, skills,
+manifests) lives there instead. "Fork the surface, not the runtime."</div>
+
+<h2>Monorepo map</h2>
+<div class="table-wrap"><table>
+<tr><th>Directory</th><th>What it is</th></tr>
+<tr><td><code>agent/</code></td><td>The core agent loop — planning, tool calling, subagent spawning, context management.</td></tr>
+<tr><td><code>gateway/</code></td><td>One process that connects the agent to <strong>Discord, Telegram, Slack, WhatsApp, Signal, Email and the CLI</strong> simultaneously, with cross-platform conversation continuity and voice-memo transcription.</td></tr>
+<tr><td><code>hermes_cli/</code>, <code>cli.py</code></td><td>The terminal interface — full TUI with multiline editing, slash commands, streaming tool output, interrupt-and-redirect.</td></tr>
+<tr><td><code>desktop/</code></td><td><strong>Hermes Desktop</strong> — Electron 38 + TypeScript client, built with esbuild. Ours is customized as the "IX Agency admin portal shell with VPN, MCP and Skills panels". See <a href="desktop.html">Desktop apps</a>.</td></tr>
+<tr><td><code>cron/</code></td><td>Built-in scheduler: natural-language scheduled automations (daily reports, weekly audits) delivered to any connected platform.</td></tr>
+<tr><td><code>acp_adapter/</code>, <code>acp_registry/</code></td><td>Agent Client Protocol support — lets IDEs and other agent clients drive Hermes as a backend.</td></tr>
+<tr><td><code>docker/</code>, <code>docker-compose.yml</code>, <code>Dockerfile</code></td><td>Container builds. Our production image is built from this tree (see hermes-deployment for the manifest that runs it).</td></tr>
+<tr><td><code>batch_runner.py</code>, <code>datagen-config-examples/</code></td><td>Research tooling: batch trajectory generation and compression for training tool-calling models.</td></tr>
+<tr><td><code>docs/</code></td><td>Upstream docs (also published at hermes-agent.nousresearch.com). Firecrawl-pulled copies live in <code>.firecrawl/</code> for offline reference.</td></tr>
+</table></div>
+
+<h2>The capabilities that matter for the Agency</h2>
+<div class="cards">
+  <div class="card"><h3>Learning loop</h3>
+  <p>Creates skills from experience, self-improves them during use, FTS5 full-text search over its own
+  past sessions, and <a href="https://github.com/plastic-labs/honcho" target="_blank" rel="noreferrer">Honcho</a>
+  dialectic user modeling. Compatible with the agentskills.io standard — which is why our shared
+  <a href="agent-skills.html">skill registry</a> plugs straight in.</p></div>
+  <div class="card"><h3>MCP-native tools</h3>
+  <p>Every integration is an MCP server — the same ones the admin portal copilot uses (Content Factory,
+  Gas Town, Leantime, n8n, Firecrawl…). No bespoke connectors to maintain.</p></div>
+  <div class="card"><h3>Lives where you do</h3>
+  <p>One gateway process serves Discord, Telegram, Slack, WhatsApp, Signal, Email and CLI at once.
+  Start a conversation on Discord, continue it in the terminal.</p></div>
+  <div class="card"><h3>Runs anywhere</h3>
+  <p>Six terminal backends — local, Docker, SSH, Singularity, Modal, Daytona. Serverless backends
+  hibernate when idle, so a 24/7 agent costs nearly nothing between tasks.</p></div>
+  <div class="card"><h3>Delegation</h3>
+  <p>Spawns isolated subagents for parallel workstreams, and can write Python scripts that call its own
+  tools via RPC — collapsing multi-step pipelines into single turns.</p></div>
+  <div class="card"><h3>Scheduled automations</h3>
+  <p>Cron in natural language: "every weekday at 9am, summarize new Leantime tickets to Discord" — no
+  external scheduler needed.</p></div>
+</div>
+
+<h2>Model access</h2>
+<p>The runtime supports any provider, but in our deployment <strong>every LLM call goes through
+LiteLLM</strong> (configured as <code>provider: custom</code> in hermes-deployment's
+<code>config.yaml</code>). That gives us one budget, one key to rotate, model switching without code
+changes, and automatic Langfuse tracing. The agent never sees a raw OpenAI/Anthropic key.</p>
+
+<h2>Relationship to the other repos</h2>
+<div class="table-wrap"><table>
+<tr><th>Repo</th><th>Relationship</th></tr>
+<tr><td><a href="hermes-deployment.html"><code>hermes-deployment</code></a></td><td>Builds its Docker image <em>from</em> this fork, then layers our config, context and skills on top. Day-to-day changes happen there.</td></tr>
+<tr><td><a href="agent-skills.html"><code>agent-skills</code></a></td><td>Mounted read-only as an external skill directory — the runtime sees those skills as its own.</td></tr>
+<tr><td><a href="desktop.html">Desktop shells</a></td><td><code>desktop/</code> in this repo is the Hermes-native client; the separate Tauri shell wraps the admin portal instead.</td></tr>
+</table></div>
+
+<div class="callout"><span class="title">Also in the org: <code>hermes-agent-1</code></span>
+A second clone kept as a clean upstream mirror for salvage/comparison work. The deployable fork is
+<code>hermes-agent</code>; nothing builds from <code>hermes-agent-1</code>.</div>
+
+<footer class="page-footer">
+<span>AI Agency architecture · <code>intelli-verse-x/hermes-agent</code></span>
+<span><a href="index.html">← Overview</a></span>
+</footer>
+</main>
+</div>
+</body>
+</html>

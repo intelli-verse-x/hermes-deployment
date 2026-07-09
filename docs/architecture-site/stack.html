@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Platform wiring · AI Agency Architecture</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/app.js"></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+  <button class="menu-btn">Menu</button>
+  <div class="logo"><span class="dot"></span> AI Agency Architecture</div>
+  <div class="tagline">Intelliverse · one page per codebase</div>
+  <nav>
+    <a href="index.html">🏠 Overview</a>
+    <a href="hermes-agent.html">🤖 hermes-agent — runtime fork</a>
+    <a href="hermes-deployment.html">🚀 hermes-deployment — ops glue</a>
+    <a href="desktop.html">🖥️ Desktop apps</a>
+    <a href="agent-skills.html">🧩 agent-skills — registry</a>
+    <a href="stack.html" class="active">🧱 Platform wiring</a>
+  </nav>
+  <button class="theme-toggle"></button>
+</aside>
+<main>
+<h1>Platform wiring — what the Agency stands on</h1>
+<p class="lede">The four AI Agency codebases don't work alone. They plug into the intelli-verse-x
+platform: a model gateway, a work-tracking fabric, a content engine, and the same MCP servers that
+power the admin portal copilot. This page maps those connections.</p>
+
+<h2>The 5-layer stack</h2>
+<div class="table-wrap"><table>
+<tr><th>Layer</th><th>Services</th><th>Job</th></tr>
+<tr><td>1 · Strategy</td><td>Leantime, GitHub</td><td>What <em>humans</em> care about: goals, tickets, code work.</td></tr>
+<tr><td>2 · Coordination</td><td>Beads (<code>bd</code>), Bernstein</td><td>What <em>agents</em> do: the issue graph and each project's autonomous crew.</td></tr>
+<tr><td>3 · Multi-project</td><td>Gas Town (rigs, polecats, Mayor)</td><td>The fabric that spans every repo — dispatching, convoys, mail.</td></tr>
+<tr><td>4 · Platform</td><td>LiteLLM, Infisical, Langfuse</td><td>Model gateway (one budget, any provider), secrets, observability.</td></tr>
+<tr><td>5 · Glue</td><td>n8n, GitHub Actions</td><td>Workflow automation and CI.</td></tr>
+</table></div>
+<p>The AI Agency (Hermes) sits <strong>on top of all five</strong> as the user-facing conversational
+layer: it translates plain-English asks into bead-tracked work and dispatches through the right layer.
+It is deliberately <em>not</em> the router between specialist agents — Gas Town's Mayor and Beads own
+that.</p>
+
+<h2>Model access — LiteLLM only</h2>
+<ul>
+  <li>Hermes is configured with <code>provider: custom</code> pointing at the LiteLLM gateway. Model
+  switching (<code>hermes model</code>) needs no code or key changes.</li>
+  <li>Budgets and keys are per-team virtual keys; traces flow to Langfuse automatically.</li>
+  <li>The same gateway serves the admin copilot, Content Factory and every other service — see the
+  <a href="https://intelliverse-llm-docs.s3.amazonaws.com/index.html" target="_blank" rel="noreferrer">AI Platform Docs (LiteLLM)</a>.</li>
+</ul>
+
+<h2>Tool access — MCP everywhere</h2>
+<p>Every capability is an MCP server; the agent's priority order (from <code>config/AGENTS.md</code>):</p>
+<div class="table-wrap"><table>
+<tr><th>Want to…</th><th>MCP tools</th><th>Backing service</th></tr>
+<tr><td>Read/write strategy tickets</td><td><code>mcp_leantime_*</code></td><td>Leantime</td></tr>
+<tr><td>File/track agent work</td><td><code>mcp_gt_bd_*</code>, <code>mcp_gt_*</code></td><td>Beads + Gas Town</td></tr>
+<tr><td>Generate video/image/audio</td><td><code>mcp_content_factory_*</code></td><td>Content Factory (50+ pipelines)</td></tr>
+<tr><td>Trigger automations</td><td><code>mcp_n8n_*</code></td><td>n8n</td></tr>
+<tr><td>Research / scrape the web</td><td><code>mcp_firecrawl_*</code></td><td>Firecrawl (replaces built-in web tools)</td></tr>
+<tr><td>Sandbox file work</td><td><code>mcp_filesystem_*</code></td><td>Scoped to <code>~/hermes-workspace</code></td></tr>
+<tr><td>In-house analytics</td><td><code>mcp_intelli_verse_x_*</code></td><td>Platform APIs</td></tr>
+</table></div>
+<div class="callout warn"><span class="title">Tool-bloat rule</span>
+The agent doesn't keep every server enabled forever — finished with a Content Factory run, it drops
+those tools (<code>/toolset</code>, <code>mcp_disable_server</code>). Context is a budget.</div>
+
+<h2>Relationship to the admin portal copilot</h2>
+<p>The AI Agency and the <a href="https://admin.intelli-verse-x.ai/admin/portal" target="_blank" rel="noreferrer">admin
+portal copilot</a> are siblings, not the same thing:</p>
+<div class="table-wrap"><table>
+<tr><th></th><th>Admin portal copilot</th><th>AI Agency (Hermes)</th></tr>
+<tr><td>Lives in</td><td>The browser (portal chat)</td><td>A 24/7 gateway process (cluster or laptop)</td></tr>
+<tr><td>Reaches tools via</td><td><code>admin-mcp</code> gateway (~48 downstream MCP servers)</td><td>Direct MCP client connections from <code>config.yaml</code></td></tr>
+<tr><td>Memory</td><td>Per-conversation</td><td>Persistent: session search, curated memory, user modeling</td></tr>
+<tr><td>Skills</td><td>Portal skill catalog (<a href="https://intelliverse-skills-docs.s3.amazonaws.com/index.html" target="_blank" rel="noreferrer">Skills Guide</a>)</td><td>agentskills.io mounts (7 repos)</td></tr>
+<tr><td>Best for</td><td>Quick reads and gated writes across the stack</td><td>Long-running, learning, scheduled, multi-channel work</td></tr>
+</table></div>
+<p>They share the underlying services (LiteLLM, the MCP servers, the skill philosophy), so a capability
+added for one is usually a config edit away for the other.</p>
+
+<h2>Operational endpoints</h2>
+<div class="table-wrap"><table>
+<tr><th>What</th><th>Where</th></tr>
+<tr><td>Hermes dashboard</td><td><code>hermes.intelli-verse-x.ai</code></td></tr>
+<tr><td>Hermes API</td><td><code>hermes-api.intelli-verse-x.ai</code></td></tr>
+<tr><td>Cluster</td><td>EKS, namespace <code>aicart</code>, deploy <code>hermes</code></td></tr>
+<tr><td>Image</td><td>ECR <code>hermes-agent:latest</code> (built from the pinned fork)</td></tr>
+<tr><td>Runbook</td><td><code>hermes-deployment/docs/operating-runbook.md</code></td></tr>
+<tr><td>Admin portal</td><td><code>admin.intelli-verse-x.ai/admin/portal</code></td></tr>
+</table></div>
+
+<footer class="page-footer">
+<span>AI Agency architecture · platform wiring</span>
+<span><a href="index.html">← Overview</a></span>
+</footer>
+</main>
+</div>
+</body>
+</html>

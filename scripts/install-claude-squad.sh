@@ -28,12 +28,18 @@ fi
 ok "brew: $(command -v brew)"
 
 bold "2. claude-squad install..."
-if command -v cs >/dev/null 2>&1 || brew list claude-squad >/dev/null 2>&1; then
+if brew list claude-squad >/dev/null 2>&1; then
   ok "already installed; running brew upgrade"
   brew upgrade claude-squad 2>&1 | tail -3 || true
 else
   brew install claude-squad 2>&1 | tail -5
-  ok "installed: $(command -v cs || echo claude-squad)"
+fi
+# The brew formula installs `claude-squad`; the project's docs refer to it
+# as `cs`. Create a shim so `cs` works in muscle memory.
+if [ ! -x /opt/homebrew/bin/cs ] && [ -x /opt/homebrew/bin/claude-squad ]; then
+  ln -sf /opt/homebrew/bin/claude-squad /opt/homebrew/bin/cs || \
+    ln -sf /opt/homebrew/bin/claude-squad "$HOME/bin/cs"
+  ok "shimmed: cs → claude-squad"
 fi
 
 bold "3. tmux check..."
