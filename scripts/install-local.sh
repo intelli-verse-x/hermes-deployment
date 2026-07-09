@@ -91,6 +91,29 @@ for cli in gt bd firecrawl npx uvx; do
   fi
 done
 
+bold "5b. Checking coding-loop / deploy prerequisites..."
+# Not hard requirements — Hermes runs without them — but GitHub source-code
+# fixes need git+gh, and deploy verification needs kubectl with a kubeconfig.
+if command -v git >/dev/null 2>&1; then
+  ok "git: $(command -v git)"
+else
+  warn "git not on PATH — GitHub skills (PR workflow, code review) won't work"
+fi
+if command -v gh >/dev/null 2>&1; then
+  if gh auth status >/dev/null 2>&1; then
+    ok "gh: authenticated"
+  else
+    warn "gh installed but not authenticated — run: gh auth login"
+  fi
+else
+  warn "gh not on PATH — install GitHub CLI (brew install gh) for PR/issue workflows"
+fi
+if command -v kubectl >/dev/null 2>&1; then
+  ok "kubectl: $(command -v kubectl)"
+else
+  warn "kubectl not on PATH — deploy checks stay read-only via the Grafana MCP"
+fi
+
 bold "6. Checking required env vars..."
 ENV_FILE="$HERMES_HOME/.env"
 if [ ! -f "$ENV_FILE" ]; then
@@ -104,7 +127,9 @@ fi
 bold "Done."
 echo
 echo "Next steps:"
-echo "  1) Edit ~/.hermes/.env and fill the keys (LITELLM_API_KEY at minimum)."
+echo "  1) Edit ~/.hermes/.env and fill the keys (LITELLM_API_KEY + ADMIN_MCP_TOKEN at minimum)."
+echo "     ADMIN_MCP_TOKEN is scoped to your email's access grant — ask a super admin,"
+echo "     or if you are one: kubectl get secret admin-mcp-token -n aicart -o jsonpath='{.data.ADMIN_MCP_TOKEN}' | base64 -d"
 echo "  2) Run: hermes doctor    # checks config + connectivity"
 echo "  3) Run: hermes           # start chatting"
 echo

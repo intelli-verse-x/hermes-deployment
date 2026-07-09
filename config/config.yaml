@@ -40,6 +40,19 @@ fallback_models:
   - "openai/gpt-5"
 
 mcp_servers:
+  # ── 0. Intelliverse-X admin gateway ─────────────────────────────────────
+  # 7 meta-tools (admin_list_tools, admin_mcp_directory, admin_call_mcp, …)
+  # that fan out to every per-service MCP in the engagement stack
+  # (documenso, ga4, gsc, posthog, chatwoot, metabase, …) with default
+  # credentials wired server-side. The token determines scope: super-admin
+  # tokens see everything; per-user tokens are minted scoped to the
+  # employee's email access grant (app-ids + team bundles).
+  admin-mcp:
+    url: "https://admin-mcp.intelli-verse-x.ai/"
+    timeout: 60
+    headers:
+      Authorization: "Bearer ${ADMIN_MCP_TOKEN}"
+
   # ── 1. Gas Town beads/rigs/mail ─────────────────────────────────────────
   # gt itself is an MCP server (added in gastown#8, via Ophis Cobra→MCP
   # bridge). Exposes ~289 read + coordination subcommands. Hermes can list
@@ -98,14 +111,91 @@ mcp_servers:
     env:
       INTELLI_VERSE_X_API_TOKEN: "${INTELLI_VERSE_X_API_TOKEN}"
 
-  # ── 7. Firecrawl (research, web scraping) ──────────────────────────────
+  # ── 7. Direct EKS MCP deployments ───────────────────────────────────────
+  # Every public MCP ingress from the admin-mcp registry, wired first-class so
+  # Hermes sees each service's own tools without going through the gateway's
+  # admin_call_mcp meta-tool. Bearer placeholders resolve from .env; wrappers
+  # marked "default key pre-wired" work without a token. In-cluster-only
+  # tiles (aws-costs, stripe, ga4, …) remain gateway-only.
+  notifuse: # Email & push campaigns
+    url: "https://notifuse-mcp.intelli-verse-x.ai/mcp"
+    timeout: 60
+    headers:
+      Authorization: "Bearer ${NOTIFUSE_MCP_TOKEN}"
+
+  whatsapp: # WhatsApp Business (OpenBSP)
+    url: "https://openbsp-mcp.intelli-verse-x.ai/"
+    timeout: 60
+    headers:
+      Authorization: "Bearer ${WHATSAPP_MCP_TOKEN}"
+
+  fonoster: # Make / receive phone calls
+    url: "https://fonoster-mcp.intelli-verse-x.ai/"
+    timeout: 60
+    headers:
+      Authorization: "Bearer ${FONOSTER_MCP_TOKEN}"
+
+  postiz: # Social-media scheduling (org key baked into the wrapper)
+    url: "https://postiz-mcp.intelli-verse-x.ai/"
+    timeout: 60
+
+  twenty: # CRM — contacts & deals
+    url: "https://crm.intelli-verse-x.ai/mcp"
+    timeout: 60
+    headers:
+      Authorization: "Bearer ${TWENTY_MCP_TOKEN}"
+
+  chatwoot: # Shared inbox
+    url: "https://chatwoot-mcp.intelli-verse-x.ai/"
+    timeout: 60
+    headers:
+      Authorization: "Bearer ${CHATWOOT_MCP_TOKEN}"
+
+  telnyx: # Telephony & SMS (default key pre-wired; override via .env)
+    url: "https://telnyx-mcp.intelli-verse-x.ai/"
+    timeout: 60
+    headers:
+      Authorization: "Bearer ${TELNYX_MCP_TOKEN}"
+
+  nakama-console: # Game ops — players, wallets, flags (server-side auth)
+    url: "https://nakama-mcp.intelli-verse-x.ai/"
+    timeout: 60
+
+  grafana: # Alerts, dashboards, ad-hoc PromQL (Viewer SA token pre-wired)
+    url: "https://grafana-mcp.intelli-verse-x.ai/"
+    timeout: 60
+
+  documenso: # Contracts & signatures — full lifecycle
+    url: "https://documenso-mcp.intelli-verse-x.ai/"
+    timeout: 60
+    headers:
+      Authorization: "Bearer ${DOCUMENSO_MCP_TOKEN}"
+
+  intelliverse-mcp: # In-house platform MCP (~1300 tools)
+    url: "https://mcp.intelli-verse-x.ai/api/mcp"
+    timeout: 60
+    headers:
+      Authorization: "Bearer ${INTELLIVERSE_MCP_TOKEN}"
+
+  agent-mcp: # Content Factory agent (pipeline runs, releases, ads)
+    url: "https://agent-mcp.intelli-verse-x.ai/mcp"
+    timeout: 60
+
+  open-seo: # OpenSEO — keyword research, SERP, rank tracker (self-hosted)
+    url: "https://seo.toba-tech.ai/mcp"
+    timeout: 60
+
+  # ── 8. Firecrawl (research, web scraping) ──────────────────────────────
   firecrawl:
     command: "firecrawl"
     args: ["mcp", "serve"]
     env:
       FIRECRAWL_API_KEY: "${FIRECRAWL_API_KEY}"
+      # Self-hosted Firecrawl (intelli-verse-kube-infra/firecrawl/); unset to
+      # fall back to Firecrawl cloud.
+      FIRECRAWL_API_URL: "${FIRECRAWL_API_URL}"
 
-  # ── 8. Filesystem (sandboxed) ──────────────────────────────────────────
+  # ── 9. Filesystem (sandboxed) ──────────────────────────────────────────
   # Read-write access only to ~/hermes-workspace so Hermes doesn't roam.
   filesystem:
     command: "npx"
@@ -136,6 +226,8 @@ skills:
     - "${HOME}/dev/hyperframes/skills"
     # 7) Bundled hermes-deployment skills (this repo)
     - "${HOME}/dev/hermes-deployment/skills"
+    # 7b) Nakama backend skills (nakama-rpc, nakama-economy, seo-* playbooks)
+    - "${HOME}/dev/nakama/.agents/skills"
     # 8-15) Curated packs from the upstream Hermes skills library (our fork,
     #    ~/dev/hermes-agent/skills) — the best of Nous Research's catalog for
     #    AI-Agency work. Deliberately NOT the whole tree: apple/, smart-home/,
