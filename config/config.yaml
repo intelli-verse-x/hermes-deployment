@@ -44,9 +44,11 @@ mcp_servers:
   # 7 meta-tools (admin_list_tools, admin_mcp_directory, admin_call_mcp, …)
   # that fan out to every per-service MCP in the engagement stack
   # (documenso, ga4, gsc, posthog, chatwoot, metabase, …) with default
-  # credentials wired server-side. The token determines scope: super-admin
-  # tokens see everything; per-user tokens are minted scoped to the
-  # employee's email access grant (app-ids + team bundles).
+  # credentials wired server-side. NOTE: ADMIN_MCP_TOKEN is currently a SHARED
+  # cluster secret — bare-token callers get SUPER scope (all apps/bundles)
+  # while ADMIN_MCP_ALLOW_UNSCOPED=true. Per-user scoped tokens are a planned
+  # improvement, not yet implemented; scoping today only applies to the portal
+  # frontend via the signed X-Portal-Scope header. Treat this as shared prod.
   admin-mcp:
     url: "https://admin-mcp.intelli-verse-x.ai/"
     timeout: 60

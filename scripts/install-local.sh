@@ -128,8 +128,9 @@ bold "Done."
 echo
 echo "Next steps:"
 echo "  1) Edit ~/.hermes/.env and fill the keys (LITELLM_API_KEY + ADMIN_MCP_TOKEN at minimum)."
-echo "     ADMIN_MCP_TOKEN is scoped to your email's access grant — ask a super admin,"
-echo "     or if you are one: kubectl get secret admin-mcp-token -n aicart -o jsonpath='{.data.ADMIN_MCP_TOKEN}' | base64 -d"
+echo "     ADMIN_MCP_TOKEN is currently a SHARED cluster secret (not per-user/per-email)."
+echo "     Treat it as a shared production credential. Ask a super admin, or if you are one:"
+echo "     kubectl get secret admin-mcp-token -n aicart -o jsonpath='{.data.ADMIN_MCP_TOKEN}' | base64 -d"
 echo "  2) Run: hermes doctor    # checks config + connectivity"
 echo "  3) Run: hermes           # start chatting"
 echo
