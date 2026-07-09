@@ -136,6 +136,29 @@ skills:
     - "${HOME}/dev/hyperframes/skills"
     # 7) Bundled hermes-deployment skills (this repo)
     - "${HOME}/dev/hermes-deployment/skills"
+    # 8-15) Curated packs from the upstream Hermes skills library (our fork,
+    #    ~/dev/hermes-agent/skills) — the best of Nous Research's catalog for
+    #    AI-Agency work. Deliberately NOT the whole tree: apple/, smart-home/,
+    #    dogfood/ and index-cache/ are excluded as noise for this deployment.
+    # 8) Research: arxiv, blogwatcher, llm-wiki, polymarket, paper writing
+    - "${HOME}/dev/hermes-agent/skills/research"
+    # 9) Creative: architecture-diagram, design-md, excalidraw, manim-video,
+    #    comfyui, infographics, humanizer, p5js, songwriting
+    - "${HOME}/dev/hermes-agent/skills/creative"
+    # 10) Productivity: google-workspace, notion, airtable, powerpoint,
+    #    ocr-and-documents, nano-pdf, maps, teams-meeting-pipeline
+    - "${HOME}/dev/hermes-agent/skills/productivity"
+    # 11) GitHub: code review, PR workflow, issues, codebase inspection, auth
+    - "${HOME}/dev/hermes-agent/skills/github"
+    # 12) Software development: plan, spike, systematic-debugging, TDD,
+    #    simplify-code, requesting-code-review, skill-authoring
+    - "${HOME}/dev/hermes-agent/skills/software-development"
+    # 13) Media: youtube-content, gif-search, songsee
+    - "${HOME}/dev/hermes-agent/skills/media"
+    # 14) Data science: jupyter-live-kernel
+    - "${HOME}/dev/hermes-agent/skills/data-science"
+    # 15) Email: himalaya CLI email client
+    - "${HOME}/dev/hermes-agent/skills/email"
 
   # Don't auto-load every skill into the system prompt — too many. Load on
   # demand via /<skill-name> or `skill_view`.
